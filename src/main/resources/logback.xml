@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration scan="true" scanPeriod="60 seconds">
   <property name="FILE_LOG_PATH"
-            value="/usr/local/Cellar/tomcat/8.0.35/logs/derivative-generator${logfile.extension:-.log}"/>
+            value="/var/lib/tomcat7/logs/derivative-route${logfile.extension:-.log}"/>
 
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
@@ -10,11 +10,11 @@
   </appender>
 
   <!--  To log to a file:
-    1. set the property INDEXER_LOG_PATH (above) to a valid file path
+    1. set the property FILE_LOG_PATH (above) to a valid file path
     2. uncomment the below appender
-    3. change the appender-ref in the logger elements from STDOUT to INDEXER
+    3. change the appender-ref in the logger elements from STDOUT to FILELOG
   -->
-
+<!--
   <appender name="FILELOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
     <file>${FILE_LOG_PATH}</file>
     <encoder>
@@ -28,7 +28,7 @@
       <MaxFileSize>20MB</MaxFileSize>
     </triggeringPolicy>
   </appender>
-  
+-->  
    <logger name="ca.umanitoba.dam" additivity="false" level="debug">
     <appender-ref ref="STDOUT"/>
   </logger>

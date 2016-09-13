@@ -10,6 +10,7 @@
     <property name="location" value="classpath:application.properties"/>
   </bean>
 
+ <!-- 
   <bean id="jmsConnectionFactory" class="org.apache.activemq.ActiveMQConnectionFactory">
      <property name="brokerURL" value="${activemq.brokerUrl}" />
   </bean>
@@ -23,12 +24,12 @@
   <bean id="jmsConfig" class="org.apache.camel.component.jms.JmsConfiguration">
      <property name="connectionFactory" ref="pooledConnectionFactory"/>
      <property name="concurrentConsumers" value="1"/>
-     <!-- <property name="concurrentConsumers" value="10"/> -->
   </bean>
 
   <bean id="activemq" class="org.apache.activemq.camel.component.ActiveMQComponent">
       <property name="configuration" ref="jmsConfig"/>
   </bean>
+ -->
 
   <bean id="myLogger" class="org.slf4j.LoggerFactory" factory-method="getLogger">
       <constructor-arg value="ca.umanitoba.dam"/>

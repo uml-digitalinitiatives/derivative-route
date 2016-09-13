@@ -43,7 +43,7 @@ configurations {
 }
 
 dependencies {
-	compile group: 'org.apache.activemq', name: 'activemq-camel', version: versions.activemq
+	//compile group: 'org.apache.activemq', name: 'activemq-camel', version: versions.activemq
 	compile group: 'org.apache.camel', name: 'camel-core', version: versions.camel
 	compile group: 'org.apache.camel', name: 'camel-exec', version: versions.camel
 	compile group: 'org.apache.camel', name: 'camel-test', version: versions.camel
