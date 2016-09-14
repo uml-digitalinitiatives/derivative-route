@@ -1,19 +1,9 @@
-buildscript {
-    repositories {
-        jcenter()
-    }
-
-    dependencies {
-        classpath 'com.bmuschko:gradle-tomcat-plugin:2.2.5'
-    }
-}
 plugins {
   id "com.github.lburgazzoli.camel" version "0.0.7"
 }
 apply plugin: 'java'
 apply plugin: 'eclipse-wtp'
 apply plugin: 'war'
-apply plugin: 'com.bmuschko.tomcat'
 
 ext {
 	versions = [
