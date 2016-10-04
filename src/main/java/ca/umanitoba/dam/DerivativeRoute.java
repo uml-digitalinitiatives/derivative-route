@@ -8,6 +8,7 @@ import static org.apache.camel.component.exec.ExecBinding.EXEC_STDERR;
 import static org.apache.camel.LoggingLevel.DEBUG;
 import static org.apache.camel.LoggingLevel.INFO;
 import static org.apache.camel.LoggingLevel.ERROR;
+import static org.apache.camel.LoggingLevel.TRACE;
 
 import org.apache.camel.PropertyInject;
 import org.apache.camel.builder.RouteBuilder;
@@ -37,12 +38,12 @@ public class DerivativeRoute extends RouteBuilder {
         logger.debug("source.directory is {}", this.directory);
         
         /**
-         * Listen for a PDF in this directory
+         * How to handle exceptions with exec:
          */
-        from("file:{{source.directory}}?recursive=true&noop=true&include=.*\\.pdf")
-        .description("Process PDF/Tiff files")
-        .log(INFO, "Process PDF ${file:name}")
-        .to("direct:processPDF");
+        onException(ExecException.class)
+        .process(new FunctionalExceptionHandler())
+        .maximumRedeliveries(3)
+        .handled(false);
         
         /**
          * Listen for HOCR.hocr and move to HOCR.html
@@ -61,20 +62,27 @@ public class DerivativeRoute extends RouteBuilder {
         /**
          * Listen for OBJ.tiff and process
          */
-        from("file:{{source.directory}}?recursive=true&include=OBJ.tiff&noop=true")
+        from("file:{{source.directory}}?recursive=true&include=OBJ.tiff&noop=true&readLock=fileLock")
         .description("OBJ.tiff file listener")
-        .log(INFO, "Process Tiff ${header.CamelFileAbsolutePath}")
+        .log(DEBUG, "Got a tiff in the source.directory")
         .setProperty("tiffFile", simple("${header.CamelFileAbsolutePath}"))
         .setProperty("workingDir", simple("${header.CamelFileParent}"))
-        .to("seda:processTiff")
-        .log(INFO, "Finished processing ${header.CamelFileAbsolutePath}");
+        .to("seda:processTiff");
+        
+        /**
+         * Listen for a PDF in this directory
+         */
+        from("file:{{source.directory}}?recursive=true&noop=true&include=PDF.pdf&readLock=fileLock")
+        .description("Process PDF/Tiff files")
+        .log(INFO, "Process PDF ${file:name}")
+        .to("direct:processPDF");
         
         /**
          * Process source PDF
          */
         from("direct:processPDF")
         .description("Process input PDF")
-        .log("Starting Processing for ${header.CamelFileNameOnly}")
+        .log(DEBUG, "Processing PDF ${header.CamelFileAbsolutePath}")
         .setProperty("workingDir", simple("${header.CamelFileParent}"))
         .setProperty("pdfFile", simple("${header.CamelFileAbsolutePath}"))
         .removeHeaders("*")
@@ -89,6 +97,7 @@ public class DerivativeRoute extends RouteBuilder {
          */
         from("seda:processTiff?blockWhenFull=true&concurrentConsumers={{concurrent.consumers}}")
         .description("Make derivatives from Tiff")
+        .log(DEBUG, "Process Tiff ${property.tiffFile}")
         .removeHeader("checkFile").setHeader("checkFile", simple("${property.workingDir}/JP2.jp2"))
         .filter().expression(method(ExistenceCheck.class, "fileNotExists"))
             .to("direct:makeJP2").end()
@@ -105,25 +114,21 @@ public class DerivativeRoute extends RouteBuilder {
         .filter().expression(method(ExistenceCheck.class, "fileNotExists"))
             .to("direct:makeOcr").end()
         .removeHeader("checkFile");
-        
-        
+
         /**
          * Make Tiff from PDF
          */
         from("direct:makeTiff")
         .description("Make Tiff from PDF")
         .log(DEBUG, "Processing Tiff from ${property.pdfFile}")
-        .log(DEBUG, "Execute: exec:convert -density " + adjustedDensity + " ${property.pdfFile} +profile icc -resize 75% -colorspace rgb -alpha Off ${property.workingDir}/OBJ.tiff")
+        .log(TRACE, "Execute: exec:convert -density " + adjustedDensity + " ${property.pdfFile} +profile icc -resize 75% -colorspace rgb -alpha Off ${property.workingDir}/OBJ.tiff")
         .setBody(constant(null))
         .removeHeaders("*")
         .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
         .setHeader(EXEC_COMMAND_ARGS, simple(" -density " + adjustedDensity + " ${property.pdfFile} +profile icc -resize 75% -colorspace rgb -alpha Off ${property.workingDir}/OBJ.tiff"))
-        .to("exec:convert")
+        .to("exec:{{apps.convert}}")
         .log(DEBUG, "Finish exec with ${header." + EXEC_EXIT_VALUE + "}")
-        .choice()
-        .when(header(EXEC_EXIT_VALUE).isEqualTo(0))
-            .log("Generated Tiff from ${property.pdfFile}")
-        .otherwise()
+        .filter(header(EXEC_EXIT_VALUE).isEqualTo(0))
             .log(ERROR, "DID NOT generate Tiff from ${property.pdfFile}")
             .log(ERROR, "Error: ${header." + EXEC_STDERR + "}")
         .end();
@@ -153,14 +158,7 @@ public class DerivativeRoute extends RouteBuilder {
         .removeHeaders("*")
         .setBody(constant(null))
         .setHeader(EXEC_COMMAND_ARGS, simple("-i ${property.tiffFile} -o ${property.workingDir}/JP2.jp2 Creversible=yes -rate -,1,0.5,0.25 Clevels=5"))
-        .log(DEBUG, "stderr is first ${header.EXEC_STDERR}")
-        .doTry()
-            .to("exec:/usr/local/bin/kdu_compress")
-        .doCatch(ExecException.class)
-            .process(new FunctionalExceptionHandler())
-        .end()
-        .to("log:?logger=myLogger&level=DEBUG")
-        .log(DEBUG, "stderr is then ${header.EXEC_STDERR}")
+        .to("exec:{{apps.kdu_compress}}")
         .filter(header(EXEC_EXIT_VALUE).isEqualTo(1))
             .log(ERROR, "Problem creating JP2 with uncompressed Tiff.")
             .log(ERROR, "Error: ${header." + EXEC_STDERR + "}");
@@ -171,21 +169,25 @@ public class DerivativeRoute extends RouteBuilder {
         from("direct:JP2FromCompressed")
         .description("Create a JP2 using ${property.tiffFile} (compressed)")
         .log(DEBUG, "Creating JP2 from compressed Tiff")
+        .removeHeaders("*")
         .setBody(constant(null))
+        .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
         .setHeader(EXEC_COMMAND_ARGS, simple(" -compress 'None' ${property.tiffFile} ${property.tiffFile}.tmp.tiff"))
-        .to("exec:convert")
-        .removeHeader(EXEC_EXIT_VALUE)
+        .to("exec:{{apps.convert}}")
+        .removeHeaders("*")
         .setBody(constant(null))
+        .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
         .setHeader(EXEC_COMMAND_ARGS, simple("-i ${property.tiffFile}.tmp.tiff -o ${property.workingDir}/JP2.jp2 Creversible=yes -rate -,1,0.5,0.25 Clevels=5"))
-        .to("exec:kdu_compress")
-        .choice()
-        .when(header(EXEC_EXIT_VALUE).isEqualTo(1))
+        .to("exec:{{apps.kdu_compress}}")
+        .filter(header(EXEC_EXIT_VALUE).isEqualTo(1))
             .log(ERROR, "Problem creating JP2 from compressed Tiff")
-            .to("log:?logger=myLogger&level=DEBUG")
+            .log(ERROR, "Error: ${header." + EXEC_STDERR + "}")
             .end()
         .setBody(constant(null))
-        .removeHeader(EXEC_EXIT_VALUE)
-        .to("exec:rm ${property.tiffFile}.tmp.tiff");
+        .removeHeaders("*")
+        .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
+        .setHeader(EXEC_COMMAND_ARGS, simple("${property.tiffFile}.tmp.tiff"))
+        .to("exec:/bin/rm");
         
         /**
          * Test if Tiff is compressed
@@ -197,7 +199,7 @@ public class DerivativeRoute extends RouteBuilder {
         .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
         .setBody(constant(null))
         .setHeader(EXEC_COMMAND_ARGS, simple("-format '%[C]' ${property.tiffFile}"))
-        .to("exec:identify")
+        .to("exec:{{apps.identify}}")
         .log(DEBUG, "isCompressed identify returns (${body})")
         .setBody(body().regexReplaceAll("('|\r|\n)", ""))
         .log(DEBUG, "isCompressed mutated to (${body})")
@@ -217,12 +219,12 @@ public class DerivativeRoute extends RouteBuilder {
          */
         from("direct:makeJpeg")
         .description("Make full sized JPeG from Tiff")
-        .log("Make JPEG for ${property.tiffFile} in ${property.workingDir}")
+        .log(DEBUG, "Make JPEG for ${property.tiffFile} in ${property.workingDir}")
         .removeHeaders("*")
         .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
         .setBody(constant(null))
         .setHeader(EXEC_COMMAND_ARGS, simple("${property.tiffFile} ${property.workingDir}/JPG.jpg"))
-        .to("exec:convert")
+        .to("exec:{{apps.convert}}")
         .filter(header(EXEC_EXIT_VALUE).isEqualTo(1))
             .log(ERROR, "Problem creating JPG - ${header." + EXEC_STDERR + "}");
         
@@ -236,7 +238,7 @@ public class DerivativeRoute extends RouteBuilder {
         .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
         .setBody(constant(null))
         .setHeader(EXEC_COMMAND_ARGS, simple("${property.tiffFile} -resize 110x110 ${property.workingDir}/TN.jpg"))
-        .to("exec:convert")
+        .to("exec:{{apps.convert}}")
         .filter(header(EXEC_EXIT_VALUE).isEqualTo(1))
             .log(ERROR, "Problem creating TN - ${header." + EXEC_STDERR + "}");
         
@@ -250,10 +252,18 @@ public class DerivativeRoute extends RouteBuilder {
         .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
         .setBody(constant(null))
         .setHeader(EXEC_COMMAND_ARGS, simple("${property.tiffFile} ${property.workingDir}/HOCR -l eng hocr"))
-        .to("exec:tesseract")
+        .to("exec:{{apps.tesseract}}")
         .filter(header(EXEC_EXIT_VALUE).isEqualTo(1))
-            .log(ERROR, "Problem creating HOCR - ${header." + EXEC_STDERR + "}");
-        
+            .log(ERROR, "Problem creating HOCR - ${header." + EXEC_STDERR + "}")
+            .to("direct:makeGreyTiff")
+            .to("direct:OcrFromGray")
+            .removeHeaders("*")
+            .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
+            .setBody(constant(null))
+            .setHeader(EXEC_COMMAND_ARGS, simple(" ${property.workingDir}/OBJ_gray.tiff"))
+            .to("exec:/bin/rm")
+            .end();
+       
         /**
          * Process OCR
          */
@@ -264,9 +274,48 @@ public class DerivativeRoute extends RouteBuilder {
         .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
         .setBody(constant(null))
         .setHeader(EXEC_COMMAND_ARGS, simple("${property.tiffFile} ${property.workingDir}/OCR -l eng"))
-        .to("exec:tesseract")
+        .to("exec:{{apps.tesseract}}")
         .filter(header(EXEC_EXIT_VALUE).isEqualTo(1))
             .log(ERROR, "Problem creating OCR - ${header." + EXEC_STDERR + "}");
+
+        /**
+         * Make a Greyscale version of the Tiff
+         */
+        from("direct:makeGreyTiff")
+        .description("Make a greyscale Tiff for Tesseract")
+        .log(DEBUG, "Make Tiff greyscale")
+        .removeHeaders("*")
+        .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
+        .setBody(constant(null))
+        .setHeader(EXEC_COMMAND_ARGS, simple("${property.tiffFile} -colorspace gray -quality 100 ${property.workingDir}/OBJ_gray.tiff"))
+        .to("exec:{{apps.convert}}")
+        .filter(header(EXEC_EXIT_VALUE).isEqualTo(1))
+            .log(ERROR, "Problem creating Greyscale Tiff - ${header." + EXEC_STDERR + "}");
+
+        /**
+         * If we failed to create HOCR/OCR from Tiff
+         * use a greyscale copy of the Tiff. 
+         */
+         from("direct:OcrFromGray")
+         .description("Make HOCR and OCR from grayscale copy of Tiff")
+         .log(DEBUG, "Generate HOCR/OCR from ${property.workingDir}/OBJ_gray.tiff")
+         .removeHeaders("*")
+         .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
+         .setBody(constant(null))
+         .setHeader(EXEC_COMMAND_ARGS, simple("${property.workingDir}/OBJ_gray.tiff ${property.workingDir}/HOCR -l eng hocr"))
+         .to("exec:{{apps.tesseract}}")
+         .choice()
+         .when(header(EXEC_EXIT_VALUE).isEqualTo(0))
+             .removeHeaders("*")
+             .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
+             .setBody(constant(null))
+             .setHeader(EXEC_COMMAND_ARGS, simple("${property.workingDir}/OBJ_gray.tiff ${property.workingDir}/OCR -l eng"))
+             .to("exec:{{apps.tesseract}}").endChoice()
+         .otherwise()
+             .log(ERROR, "Problem generating HOCR from Grayscale tiff ${property.workingDir}/OBJ_gray.tiff")
+         .end();
+             
+             
         
         /**
          * Make PDF
@@ -277,7 +326,7 @@ public class DerivativeRoute extends RouteBuilder {
         .setProperty("pdfFile", simple("${property.workingDir}/PDF.pdf"))
         .setBody(constant(null))
         .setHeader(EXEC_COMMAND_ARGS, simple("${property.tiffFile} ${property.pdfFile"))
-        .to("exec:convert?useStderrOnEmptyStdout=false");
+        .to("exec:{{apps.convert}}");
         
     }
 

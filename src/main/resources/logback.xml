@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration scan="true" scanPeriod="60 seconds">
   <property name="FILE_LOG_PATH"
-            value="/var/lib/tomcat7/logs/derivative-route${logfile.extension:-.log}"/>
+            value="/var/log/tomcat7/derivative-route${logfile.extension:-.log}"/>
 
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
@@ -12,10 +12,10 @@
   <!--  To log to a file:
     1. set the property FILE_LOG_PATH (above) to a valid file path
     2. uncomment the below appender
-    3. change the appender-ref in the logger elements from STDOUT to FILELOG
+    3. change the appender-ref in the logger elements from STDOUT to FILE_LOG
   -->
 <!--
-  <appender name="FILELOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+  <appender name="FILE_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
     <file>${FILE_LOG_PATH}</file>
     <encoder>
       <pattern>%p %d{yyyy-MM-dd' 'HH:mm:ss.SSS} [%t] \(%c{0}\) %m%n</pattern>
@@ -29,8 +29,11 @@
     </triggeringPolicy>
   </appender>
 -->  
-   <logger name="ca.umanitoba.dam" additivity="false" level="debug">
+   <logger name="ca.umanitoba.dam" additivity="false" level="info">
     <appender-ref ref="STDOUT"/>
+  </logger>
+  <logger name="org.apache.camel" additivity="false" level="info">
+  	<appender-ref ref="STDOUT"/>
   </logger>
   <!-- <logger name="org.apache.camel.builder.xml" additivity="false" level="warn">
   	<appender-ref ref="STDOUT"/>
