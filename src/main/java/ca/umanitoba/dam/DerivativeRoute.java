@@ -161,7 +161,7 @@ public class DerivativeRoute extends RouteBuilder {
         .to("exec:{{apps.kdu_compress}}")
         .filter(header(EXEC_EXIT_VALUE).isEqualTo(1))
             .log(ERROR, "Problem creating JP2 with uncompressed Tiff.")
-            .log(ERROR, "Error: ${header." + EXEC_STDERR + "}");
+            .log(ERROR, "Error: ${header." + EXEC_STDERR + "}").end();
 
         /**
          * Uncompress Tiff and generate JP2
@@ -174,23 +174,26 @@ public class DerivativeRoute extends RouteBuilder {
         .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
         .setHeader(EXEC_COMMAND_ARGS, simple(" -compress None ${property.tiffFile} ${property.tiffFile}.tmp.tiff"))
         .to("exec:{{apps.convert}}")
-            .filter(header(EXEC_EXIT_VALUE).not().isEqualTo(0))
-            .log(ERROR, "Problem creating uncompressed Tiff.")
-            .log(ERROR, "Error: ${header." + EXEC_STDERR + "}")
-        .removeHeaders("*")
-        .setBody(constant(null))
-        .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
-        .setHeader(EXEC_COMMAND_ARGS, simple("-i ${property.tiffFile}.tmp.tiff -o ${property.workingDir}/JP2.jp2 Creversible=yes -rate -,1,0.5,0.25 Clevels=5"))
-        .to("exec:{{apps.kdu_compress}}")
-            .filter(header(EXEC_EXIT_VALUE).not().isEqualTo(0))
-            .log(ERROR, "Problem creating JP2 from compressed Tiff")
-            .log(ERROR, "Error: ${header." + EXEC_STDERR + "}")
-            .end()
-        .setBody(constant(null))
-        .removeHeaders("*")
-        .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
-        .setHeader(EXEC_COMMAND_ARGS, simple("${property.tiffFile}.tmp.tiff"))
-        .to("exec:/bin/rm");
+        .choice()
+            .when(header(EXEC_EXIT_VALUE).not().isEqualTo(0))
+                .log(ERROR, "Problem creating uncompressed Tiff.")
+                .log(ERROR, "Error: ${header." + EXEC_STDERR + "}")
+            .otherwise()
+                .removeHeaders("*")
+                .setBody(constant(null))
+                .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
+                .setHeader(EXEC_COMMAND_ARGS, simple("-i ${property.tiffFile}.tmp.tiff -o ${property.workingDir}/JP2.jp2 Creversible=yes -rate -,1,0.5,0.25 Clevels=5"))
+                .to("exec:{{apps.kdu_compress}}")
+                .filter(header(EXEC_EXIT_VALUE).not().isEqualTo(0))
+                    .log(ERROR, "Problem creating JP2 from compressed Tiff")
+                    .log(ERROR, "Error: ${header." + EXEC_STDERR + "}")
+                .end()
+                .setBody(constant(null))
+                .removeHeaders("*")
+                .setHeader(EXEC_COMMAND_WORKING_DIR, simple("${property.workingDir}"))
+                .setHeader(EXEC_COMMAND_ARGS, simple("${property.tiffFile}.tmp.tiff"))
+                .to("exec:/bin/rm")
+        .endChoice();
 
         /**
          * Test if Tiff is compressed
