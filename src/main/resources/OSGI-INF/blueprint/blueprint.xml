@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<blueprint xmlns="http://www.osgi.org/xmlns/blueprint/v1.0.0"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:cm="http://aries.apache.org/blueprint/xmlns/blueprint-cm/v1.1.0"
+       xsi:schemaLocation="
+       http://aries.apache.org/blueprint/xmlns/blueprint-cm/v1.1.0 http://aries.apache.org/schemas/blueprint-cm/blueprint-cm-1.1.0.xsd
+       http://www.osgi.org/xmlns/blueprint/v1.0.0 http://www.osgi.org/xmlns/blueprint/v1.0.0/blueprint.xsd
+       http://camel.apache.org/schema/blueprint http://camel.apache.org/schema/blueprint/camel-blueprint.xsd">
+
+  <!-- OSGI blueprint property placeholder -->
+  <cm:property-placeholder id="properties" persistent-id="ca.umanitoba.dam.derivatives" update-strategy="reload" >
+    <cm:default-properties>
+      <cm:property name="source.directory" value="/tmp"/>
+      <cm:property name="source.density" value="300"/>
+      <cm:property name="concurrent.consumers" value="1"/>
+      <cm:property name="apps.kdu_compress" value="/usr/bin/kdu_compress"/>
+      <cm:property name="apps.convert" value="/usr/bin/convert"/>
+      <cm:property name="apps.identify" value="/usr/bin/identify"/>
+      <cm:property name="apps.tesseract" value="/usr/bin/tesseract"/>
+    </cm:default-properties>
+  </cm:property-placeholder>
+  
+
+  <camelContext id="UmlDerivativeRoute" xmlns="http://camel.apache.org/schema/blueprint">
+    <package>ca.umanitoba.dam.derivatives</package>
+  </camelContext>
+
+</blueprint>

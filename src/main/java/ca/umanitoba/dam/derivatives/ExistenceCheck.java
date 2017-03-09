@@ -1,4 +1,4 @@
-package ca.umanitoba.dam;
+package ca.umanitoba.dam.derivatives;
 
 import java.io.File;
 

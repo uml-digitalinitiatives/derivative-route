@@ -1,4 +1,4 @@
-package ca.umanitoba.dam;
+package ca.umanitoba.dam.derivatives;
 
 import static org.apache.camel.LoggingLevel.DEBUG;
 import static org.apache.camel.LoggingLevel.ERROR;

@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<features xmlns="http://karaf.apache.org/xmlns/features/v1.3.0" name="${project.name}-${project.version}">
+
+  <repository>mvn:org.apache.camel.karaf/apache-camel/${versions.camel}/xml/features</repository>
+
+ <feature name="uml-derivative-route" version="${project.version}" start-level="80">
+    <details>Generates derivatives for files in a directory</details>
+
+    <feature version="${versions.camel}">camel-exec</feature>
+
+    <bundle>mvn:ca.umanitoba.dam.derivatives/uml-derivative-route/${project.version}</bundle>
+
+    <configfile finalname="/etc/ca.umanitoba.dam.derivatives.cfg">mvn:ca.umanitoba.dam.derivatives/uml-derivative-route/${project.version}/cfg/configuration</configfile>
+
+  </feature>
+
+</features>

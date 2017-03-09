@@ -1,66 +1,99 @@
-plugins {
-  id "com.github.lburgazzoli.camel" version "0.0.7"
-}
-apply plugin: 'java'
 apply plugin: 'eclipse-wtp'
-apply plugin: 'war'
+apply plugin: 'java'
+apply plugin: 'osgi'
+apply plugin: 'maven'
 
-ext {
-	versions = [
-		camel : '2.17.1',
-		activemq : '5.14.0',
-		spring : '4.3.1.RELEASE',
-		logback : '1.1.6',
-		log4j2 : '2.4.1'
-	]
-	
-}
-
-war {
-	baseName = 'derivative-route'
-	version = '0.0.1-SNAPSHOT'
-}
+group = 'ca.umanitoba.dam.derivatives'
+version = "0.0.1"
 
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
 repositories {
+	mavenLocal()
 	mavenCentral()
 }
 
-configurations {
-	providedRuntime
+ext {
+	vendor = "Digital Initiatives : University of Manitoba Libraries"
+	docURL = "https://github.com/uml-digitalinitiatives/derivative-route"
+	description = "Generate large image derivatives in place for a supplied directory of Tiffs."
+	license = "MIT"
+	versions = [
+		camel : '2.18.1',
+		activemq : '5.14.0',
+		spring : '4.3.1.RELEASE',
+		logback : '1.1.6',
+		log4j2 : '2.4.1',
+		slf4j : '1.7.18',
+		osgi : '1.8.0'
+	]
+	camelVersionRange = '[2.18.0, 3)'
+	defaultOsgiImports = 'org.osgi.service.blueprint;version="[1,2)",*'
+	
 }
 
 dependencies {
-	//compile group: 'org.apache.activemq', name: 'activemq-camel', version: versions.activemq
 	compile group: 'org.apache.camel', name: 'camel-core', version: versions.camel
+	compile group: 'org.apache.camel', name: 'camel-blueprint', version: versions.camel
 	compile group: 'org.apache.camel', name: 'camel-exec', version: versions.camel
-	compile group: 'org.apache.camel', name: 'camel-test', version: versions.camel
-	compile group: 'org.apache.camel', name: 'camel-spring', version: versions.camel
+	testCompile group: 'org.apache.camel', name: 'camel-test', version: versions.camel
 
-	compile group: 'ch.qos.logback', name: 'logback-classic', version: versions.logback
-	compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.18'
-
-	compile group: 'org.springframework', name: 'spring-web', version: versions.spring
-	compile group: 'org.springframework', name: 'spring-context', version: versions.spring
-	compile group: 'org.springframework', name: 'spring-core', version: versions.spring
+	compile group: 'org.slf4j', name: 'slf4j-api', version: versions.slf4j
+	
+	compile group: 'org.osgi', name: 'org.osgi.framework', version: versions.osgi
 
 }
 
 jar {
     manifest {
-        attributes 'Main-Class': 'ca.umanitoba.dam.DerivativeRun'
+      description project.description
+      vendor project.vendor
+      docURL project.docURL
+      license project.license
+      instruction 'Bundle-Activator', project.group + '.Activator'
+
+      instruction 'Import-Package', 'org.apache.camel.component.exec,' +
+                            "org.apache.camel;version=\"${camelVersionRange}\"," +
+                            "org.osgi.framework;version=\"${versions.osgi}\"," +
+                            defaultOsgiImports
+      instruction 'Export-Package', 'ca.islandora.dam.derivatives'
     }
 }
 
-camelRun {
-	trace = true
-	duration = '60s'
-	spring {
-		args = [
-			'-fa',
-			'src/main/webapp/WEB-INF/applicationContext.xml'
-		]
+
+
+task processConfig(type: Copy) {
+	from('src/main/cfg') {
+		include '**/*.cfg'
+	}
+	into 'build/cfg/main'
+	
+}
+
+task sourceJar(type: Jar) {
+	classifier 'sources'
+	from sourceSets.main.allSource
+}
+
+artifacts {
+    archives (file('build/cfg/main/ca.umanitoba.dam.derivatives.cfg')) {
+        classifier 'configuration'
+        type 'cfg'
     }
+    archives (file('build/resources/main/features.xml')) {
+        classifier 'features'
+        type 'xml'
+    }
+}
+
+classes {
+	classes.dependsOn processConfig
+}
+
+processResources {
+	include '**/*.xml'
+	exclude '**/logback.xml'
+    outputs.upToDateWhen { false  }
+    expand project.properties
 }
