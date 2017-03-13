@@ -3,14 +3,15 @@
 
   <repository>mvn:org.apache.camel.karaf/apache-camel/${versions.camel}/xml/features</repository>
 
- <feature name="uml-derivative-route" version="${project.version}" start-level="80">
+ <feature name="${project.name}" version="${project.version}" start-level="80">
     <details>Generates derivatives for files in a directory</details>
 
-    <feature version="${versions.camel}">camel-exec</feature>
+    <feature version="${camelVersionRange}">camel-exec</feature>
+    <feature version="${camelVersionRange}">camel-blueprint</feature>
 
-    <bundle>mvn:ca.umanitoba.dam.derivatives/uml-derivative-route/${project.version}</bundle>
+    <bundle>mvn:${project.group}/${project.name}/${project.version}</bundle>
 
-    <configfile finalname="/etc/ca.umanitoba.dam.derivatives.cfg">mvn:ca.umanitoba.dam.derivatives/uml-derivative-route/${project.version}/cfg/configuration</configfile>
+    <configfile finalname="/etc/ca.umanitoba.dam.derivatives.cfg">mvn:${project.group}/${project.name}/${project.version}/cfg/configuration</configfile>
 
   </feature>
 
