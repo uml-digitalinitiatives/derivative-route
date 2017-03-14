@@ -1,17 +1,17 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<features xmlns="http://karaf.apache.org/xmlns/features/v1.3.0" name="${project.name}-${project.version}">
+<features xmlns="http://karaf.apache.org/xmlns/features/v1.3.0" name="${buildName}-${project.version}">
 
   <repository>mvn:org.apache.camel.karaf/apache-camel/${versions.camel}/xml/features</repository>
 
- <feature name="${project.name}" version="${project.version}" start-level="80">
+ <feature name="${buildName}" version="${project.version}" start-level="80">
     <details>Generates derivatives for files in a directory</details>
 
     <feature version="${camelVersionRange}">camel-exec</feature>
     <feature version="${camelVersionRange}">camel-blueprint</feature>
 
-    <bundle>mvn:${project.group}/${project.name}/${project.version}</bundle>
+    <bundle>mvn:${project.group}/${buildName}/${project.version}</bundle>
 
-    <configfile finalname="/etc/ca.umanitoba.dam.derivatives.cfg">mvn:${project.group}/${project.name}/${project.version}/cfg/configuration</configfile>
+    <configfile finalname="/etc/ca.umanitoba.dam.derivatives.cfg">mvn:${project.group}/${buildName}/${project.version}/cfg/configuration</configfile>
 
   </feature>
 

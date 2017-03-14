@@ -15,6 +15,7 @@ repositories {
 }
 
 ext {
+	buildName = 'uml-derivative-route'
 	vendor = "Digital Initiatives : University of Manitoba Libraries"
 	docURL = "https://github.com/uml-digitalinitiatives/derivative-route"
 	description = "Generate large image derivatives in place for a supplied directory of Tiffs."
@@ -51,7 +52,7 @@ jar {
       instruction 'Import-Package', 'org.apache.camel.component.exec,' +
                             "org.apache.camel;version=\"${camelVersionRange}\"," +
                             defaultOsgiImports
-      instruction 'Export-Package', 'ca.islandora.dam.derivatives'
+      instruction 'Export-Package', '${project.group}'
     }
 }
 
